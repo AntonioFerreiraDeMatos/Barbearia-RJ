@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Administrativo - Barbearia RJ</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    :root {
+      --bg-principal: #0a0a0a;
+      --bg-card: #141414;
+      --border-color: #262626;
+      --text-main: #ffffff;
+      --text-muted: #a1a1aa;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-principal);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #1d1d1d;
+    }
+
+    th, td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      text-align: left;
+    }
+
+    tr:hover td {
+      background: #1a1a1a;
+    }
+
+    .status {
+      padding: 4px 12px;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .status-pendente { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+    .status-concluido { color: var(--success); background: rgba(34, 197, 94, 0.1); }
+
+    .btn {
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-main);
+      margin-right: 5px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      transition: 0.3s;
+    }
+
+    .btn-excluir:hover {
+      background: var(--danger);
+      color: #fff;
+      border-color: var(--danger);
+    }
+
+    .btn-concluir:hover {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+  <header>
+    <p class="subtitle">Gestão de Clientes</p>
+    <h1>Agendamentos</h1>
+    <button onclick="logout()" class="btn" style="margin-top: 10px; font-size: 10px;">Sair do Painel</button>
+  </header>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Telefone</th>
+          <th>Data</th>
+          <th>Hora</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="lista"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const BASE_URL = "https://barbearia-rj-backend.onrender.com";
+
+if (!localStorage.getItem("token")) {
+  alert("Acesso negado! Faça login primeiro.");
+  window.location.href = "index.html";
+}
+
+function logout() {
+    localStorage.removeItem("token");
+    window.location.href = "index.html";
+}
+
+function formatarData(data) {
+  if(!data) return "--/--/--";
+  const d = new Date(data);
+  return d.toLocaleDateString("pt-BR", { timeZone: 'UTC' });
+}
+
+function formatarHora(hora) {
+  return hora ? hora.substring(0,5) : "--:--";
+}
+
+async function carregar() {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`${BASE_URL}/agendamentos`, {
+      headers: {
+        "Authorization": "Bearer " + token
+      }
+    });
+
+    if (res.status === 401 || res.status === 403) {
+        logout();
+    }
+
+    const dados = await res.json();
+    const lista = document.getElementById("lista");
+    lista.innerHTML = "";
+
+    dados.forEach(item => {
+      // Ajuste para pegar o ID correto independente do nome da coluna no banco
+      const idAtual = item.id || item.id_agendamento; 
+      const statusTexto = item.status || "pendente";
+      const statusClasse = statusTexto === "concluido" ? "status-concluido" : "status-pendente";
+
+      lista.innerHTML += `
+        <tr>
+          <td><strong>${item.nome}</strong></td>
+          <td>${item.telefone}</td>
+          <td>${formatarData(item.data)}</td>
+          <td>${formatarHora(item.hora)}</td>
+          <td><span class="status ${statusClasse}">${statusTexto}</span></td>
+          <td>
+            <a href="https://wa.me/55${item.telefone.replace(/\D/g,'')}" target="_blank" class="btn">📞</a>
+            <button class="btn btn-concluir" onclick="concluir('${idAtual}')">✔</button>
+            <button class="btn btn-excluir" onclick="excluir('${idAtual}')">Excluir</button>
+          </td>
+        </tr>
+      `;
+    });
+
+  } catch (erro) {
+    console.error("Erro ao buscar dados:", erro);
+  }
+}
+
+async function excluir(id) {
+  if(!id || id === 'undefined') return;
+  if(!confirm("Deseja excluir este agendamento?")) return;
+  
+  const token = localStorage.getItem("token");
+
+  await fetch(`${BASE_URL}/agendamentos/${id}`, { 
+    method: "DELETE",
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  });
+
+  carregar();
+}
+
+async function concluir(id) {
+  if(!id || id === 'undefined') return;
+  const token = localStorage.getItem("token");
+
+  // Ajustado para enviar o corpo JSON que o servidor precisa para atualizar
+  await fetch(`${BASE_URL}/agendamentos/${id}`, { 
+    method: "PUT",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify({ status: "concluido" })
+  });
+
+  carregar();
+}
+
+carregar();
+</script>
+</body>
+</html>
